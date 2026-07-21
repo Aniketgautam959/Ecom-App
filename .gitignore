@@ -1,0 +1,19 @@
+# Dependencies
+**/node_modules/
+**/vendor/
+
+# Environment and local state
+**/.env
+**/.env.*
+!.env.example
+**/database/*.sqlite
+
+# Framework build output
+**/.next/
+**/.expo/
+**/dist/
+**/storage/*.key
+
+# Editor and operating-system files
+.DS_Store
+.vscode/
