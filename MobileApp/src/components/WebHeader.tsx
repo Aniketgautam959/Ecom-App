@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { styles } from "../styles";
+import { colors, styles } from "../styles";
 import type { Screen } from "../types";
 
 export function WebHeader({
@@ -25,8 +25,26 @@ export function WebHeader({
           <Pressable onPress={() => go("search")}>
             <Text style={styles.webNavIcon}>⌕</Text>
           </Pressable>
-          <Pressable onPress={() => go("cart")}>
-            <Text style={styles.webNavIcon}>🛒{cartCount > 0 ? ` ${cartCount}` : ""}</Text>
+          <Pressable onPress={() => go("cart")} style={{ position: "relative" }}>
+            <Text style={styles.webNavIcon}>🛒</Text>
+            {cartCount > 0 && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -8,
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  backgroundColor: colors.primary,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 3,
+                }}
+              >
+                <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{cartCount > 99 ? "99+" : cartCount}</Text>
+              </View>
+            )}
           </Pressable>
           <Pressable onPress={() => go("profile")}>
             <Text style={styles.webNavIcon}>◯</Text>

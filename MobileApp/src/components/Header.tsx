@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { styles } from "../styles";
+import { colors, styles } from "../styles";
 import type { Screen } from "../types";
 
 export function Header({
@@ -30,18 +30,21 @@ export function Header({
         <Text style={styles.headerTitle}>{title}</Text>
       </View>
       {showCart ? (
-        <Pressable onPress={() => go("cart")} style={{ flexDirection: "row", alignItems: "center" }}>
+        <Pressable onPress={() => go("cart")} style={{ position: "relative" }}>
           <Text style={styles.headerIcon}>🛒</Text>
           {cartCount > 0 && (
             <View
               style={{
+                position: "absolute",
+                top: -4,
+                right: -6,
                 minWidth: 16,
                 height: 16,
                 borderRadius: 8,
-                backgroundColor: "#111827",
+                backgroundColor: colors.primary,
                 justifyContent: "center",
                 alignItems: "center",
-                marginLeft: 2,
+                paddingHorizontal: 3,
               }}
             >
               <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{cartCount > 99 ? "99+" : cartCount}</Text>
