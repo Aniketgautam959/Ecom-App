@@ -26,3 +26,7 @@ export function assetUrl(path?: string | null): string | undefined {
   if (path.startsWith("http")) return path;
   return `${storageOrigin}/${path.replace(/^\//, "")}`;
 }
+
+export function unwrap<T = unknown>(response: { data: { data?: T } }): T | undefined {
+  return response.data.data;
+}

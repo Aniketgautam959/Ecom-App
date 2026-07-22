@@ -1,116 +1,228 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { api, assetUrl, messageFrom } from "./src/api";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, SafeAreaView } from "react-native";
+import { api, messageFrom, unwrap } from "./src/api";
+import { AppProvider, useApp } from "./src/context/AppContext";
+import { About } from "./src/screens/About";
+import { Account } from "./src/screens/Account";
+import { Addresses } from "./src/screens/Addresses";
+import { Auth } from "./src/screens/Auth";
+import { BrandProducts } from "./src/screens/BrandProducts";
+import { Brands } from "./src/screens/Brands";
+import { Cart } from "./src/screens/Cart";
+import { Categories } from "./src/screens/Categories";
+import { CategoryProducts } from "./src/screens/CategoryProducts";
+import { Checkout } from "./src/screens/Checkout";
+import { Contact } from "./src/screens/Contact";
+import { Faq } from "./src/screens/Faq";
+import { Home } from "./src/screens/Home";
+import { Notifications } from "./src/screens/Notifications";
+import { Onboarding } from "./src/screens/Onboarding";
+import { OrderDetails } from "./src/screens/OrderDetails";
+import { OrderFailed } from "./src/screens/OrderFailed";
+import { Orders } from "./src/screens/Orders";
+import { OrderSuccess } from "./src/screens/OrderSuccess";
+import { Payment } from "./src/screens/Payment";
+import { PrivacyPolicy } from "./src/screens/PrivacyPolicy";
+import { ProductDetail } from "./src/screens/ProductDetail";
+import { Profile } from "./src/screens/Profile";
+import { Search } from "./src/screens/Search";
+import { Settings } from "./src/screens/Settings";
+import { Shop } from "./src/screens/Shop";
+import { Support } from "./src/screens/Support";
+import { TermsConditions } from "./src/screens/TermsConditions";
+import { Track } from "./src/screens/Track";
+import { Wishlist } from "./src/screens/Wishlist";
+import type { Brand, CartItem, Category, Product, User } from "./src/types";
 
-type Screen = "onboarding" | "login" | "register" | "home" | "categories" | "search" | "product" | "wishlist" | "cart" | "checkout" | "payment" | "orders" | "order" | "track" | "profile" | "addresses" | "notifications" | "settings" | "support";
-type Product = { id: number; name: string; slug: string; price: number | string; sale_price?: number | string | null; image?: string | null; images?: string[]; category?: { name: string }; short_description?: string };
-type CartItem = Product & { quantity: number; size?: string; color?: string };
-type User = { id: number; first_name: string; last_name?: string; email_id: string; phone_number?: string };
+function Router() {
+  const { screen, go, back, setUser, user, setProducts, setCategories, setBrands, setFeatured, setLatest, setWishlist, setCart } = useApp();
+  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-const color = "#5B3DF5";
-const money = (value: number | string | null | undefined) => `₹${Number(value ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-const unwrap = (response: { data: { data?: unknown } }) => response.data.data;
+  // Onboarding + persisted auth
+  useEffect(() => {
+    (async () => {
+      const [seen, savedUser] = await Promise.all([
+        AsyncStorage.getItem("onboarding_seen"),
+        AsyncStorage.getItem("user"),
+      ]);
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser) as User);
+        } catch {
+          // ignore
+        }
+      }
+      // initial screen handled by AppProvider prop
+      setHydrated(true);
+    })();
+  }, [setUser]);
 
-function Header({ title, back, go, cartCount }: { title: string; back?: () => void; go: (screen: Screen) => void; cartCount: number }) {
-  return <View style={styles.header}>{back ? <Pressable onPress={back}><Text style={styles.back}>‹</Text></Pressable> : <Text style={styles.brand}>OK</Text>}<Text style={styles.headerTitle}>{title}</Text><Pressable onPress={() => go("cart")}><Text style={styles.cart}>🛒 {cartCount}</Text></Pressable></View>;
-}
+  // Fetch catalog
+  useEffect(() => {
+    if (!hydrated) return;
+    let active = true;
+    (async () => {
+      try {
+        const [pRes, fRes, lRes, cRes, bRes] = await Promise.all([
+          api.get("/products"),
+          api.get("/products/featured"),
+          api.get("/products/latest"),
+          api.get("/categories?status=1"),
+          api.get("/brands?status=1"),
+        ]);
+        if (!active) return;
+        setProducts((unwrap(pRes) as Product[]) ?? []);
+        setFeatured((unwrap(fRes) as Product[]) ?? []);
+        setLatest((unwrap(lRes) as Product[]) ?? []);
+        const cats = unwrap(cRes);
+        const brands = unwrap(bRes);
+        setCategories((Array.isArray(cats) ? cats : (cats as { data?: Category[] })?.data) ?? []);
+        setBrands((Array.isArray(brands) ? brands : (brands as { data?: Brand[] })?.data) ?? []);
+      } catch (err) {
+        Alert.alert("Connection error", messageFrom(err));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [hydrated, setProducts, setCategories, setBrands, setFeatured, setLatest]);
 
-function ProductCard({ item, onPress, onWish, wished }: { item: Product; onPress: () => void; onWish: () => void; wished: boolean }) {
-  const image = assetUrl(item.image ?? item.images?.[0]);
-  return <Pressable style={styles.card} onPress={onPress}><View style={styles.productImage}>{image ? <Image source={{ uri: image }} style={styles.image} /> : <Text style={styles.placeholder}>Product</Text>}<Pressable style={styles.heart} onPress={onWish}><Text>{wished ? "♥" : "♡"}</Text></Pressable></View><Text numberOfLines={2} style={styles.productName}>{item.name}</Text><Text style={styles.price}>{money(item.sale_price ?? item.price)}</Text></Pressable>;
+  // Sync account data
+  useEffect(() => {
+    if (!user) {
+      setWishlist([]);
+      setCart([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const [wRes, cRes] = await Promise.all([api.get("/wishlist"), api.get("/cart")]);
+        if (!active) return;
+        setWishlist((unwrap(wRes) as Product[]) ?? []);
+        const cartData = unwrap(cRes) as { items?: CartItem[] };
+        setCart(cartData?.items ?? []);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user, setWishlist, setCart]);
+
+  const common = { back: screen === "home" || screen === "onboarding" ? undefined : back };
+
+  switch (screen) {
+    case "onboarding":
+      return (
+        <Onboarding
+          done={async () => {
+            await AsyncStorage.setItem("onboarding_seen", "true");
+            go("login");
+          }}
+        />
+      );
+    case "login":
+      return <Auth mode="login" />;
+    case "register":
+      return <Auth mode="register" />;
+    case "forgot-password":
+      return <Auth mode="forgot-password" />;
+    case "reset-password":
+      return <Auth mode="reset-password" />;
+    case "home":
+      return <Home loading={loading} />;
+    case "shop":
+      return <Shop back={common.back!} />;
+    case "categories":
+      return <Categories back={common.back!} />;
+    case "category-products":
+      return <CategoryProducts back={common.back!} />;
+    case "brands":
+      return <Brands back={common.back!} />;
+    case "brand-products":
+      return <BrandProducts back={common.back!} />;
+    case "search":
+      return <Search back={common.back!} />;
+    case "product":
+      return <ProductDetail back={common.back!} />;
+    case "wishlist":
+      return <Wishlist back={common.back!} />;
+    case "cart":
+      return <Cart back={common.back!} />;
+    case "checkout":
+      return <Checkout back={common.back!} />;
+    case "payment":
+      return <Payment back={common.back!} />;
+    case "order-success":
+      return <OrderSuccess back={common.back!} />;
+    case "order-failed":
+      return <OrderFailed back={common.back!} />;
+    case "orders":
+      return <Orders back={common.back!} />;
+    case "order":
+      return <OrderDetails back={common.back!} />;
+    case "track":
+      return <Track back={common.back!} />;
+    case "profile":
+      return <Profile back={common.back!} />;
+    case "account":
+      return <Account back={common.back!} />;
+    case "addresses":
+      return <Addresses back={common.back!} />;
+    case "notifications":
+      return <Notifications back={common.back!} />;
+    case "settings":
+      return <Settings back={common.back!} />;
+    case "about":
+      return <About back={common.back!} />;
+    case "contact":
+      return <Contact back={common.back!} />;
+    case "faq":
+      return <Faq back={common.back!} />;
+    case "privacy-policy":
+      return <PrivacyPolicy back={common.back!} />;
+    case "terms-conditions":
+      return <TermsConditions back={common.back!} />;
+    case "support":
+    default:
+      return <Support back={common.back!} />;
+  }
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("onboarding");
-  const [history, setHistory] = useState<Screen[]>([]);
-  const [user, setUser] = useState<User | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<{ id: number; name: string; slug: string; image?: string }[]>([]);
-  const [wishlist, setWishlist] = useState<Product[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [selected, setSelected] = useState<Product | null>(null);
-  const [selectedOrder, setSelectedOrder] = useState<Record<string, unknown> | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  const [brandName, setBrandName] = useState("Oknitech");
+  const [ready, setReady] = useState(false);
+  const [startScreen, setStartScreen] = useState<"onboarding" | "login" | "home">("onboarding");
 
-  const go = (next: Screen) => { setHistory((old) => [...old, screen]); setScreen(next); };
-  const back = () => { const previous = history[history.length - 1] ?? "home"; setHistory((old) => old.slice(0, -1)); setScreen(previous); };
-  const selectProduct = (product: Product) => { setSelected(product); go("product"); };
-  const toggleWish = async (product: Product) => {
-    const exists = wishlist.some((item) => item.id === product.id);
-    setWishlist((items) => exists ? items.filter((item) => item.id !== product.id) : [...items, product]);
-    if (!user) return;
-    try { await (exists ? api.delete(`/wishlist/${product.id}`) : api.post("/wishlist", { product_id: product.id })); } catch { Alert.alert("Wishlist", "Your change could not be saved."); }
-  };
-  const addCart = async (product: Product) => {
-    setCart((items) => { const current = items.find((item) => item.id === product.id); return current ? items.map((item) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item) : [...items, { ...product, quantity: 1 }]; });
-    if (user) { try { await api.post("/cart", { product_id: product.id, quantity: 1, size: "", color: "" }); } catch { Alert.alert("Cart", "Your item was added locally but could not sync."); } }
-  };
-  const updateQuantity = async (item: CartItem, quantity: number) => {
-    if (quantity < 1) { setCart((items) => items.filter((entry) => entry.id !== item.id)); if (user) await api.delete(`/cart/${item.id}`, { data: { size: item.size ?? "", color: item.color ?? "" } }).catch(() => undefined); return; }
-    setCart((items) => items.map((entry) => entry.id === item.id ? { ...entry, quantity } : entry));
-    if (user) await api.put(`/cart/${item.id}`, { quantity, size: item.size ?? "", color: item.color ?? "" }).catch(() => undefined);
-  };
-  const refreshCatalog = async () => { setLoading(true); try { const [productRes, categoryRes] = await Promise.all([api.get("/products/featured"), api.get("/categories?status=1")]); setProducts((unwrap(productRes) as Product[]) ?? []); const data = unwrap(categoryRes) as { data?: typeof categories } | typeof categories; setCategories(Array.isArray(data) ? data : data?.data ?? []); } catch { Alert.alert("Connection error", "Could not load products. Check EXPO_PUBLIC_API_URL."); } finally { setLoading(false); } };
-  const syncAccount = async () => { if (!user) return; try { const [wishRes, cartRes] = await Promise.all([api.get("/wishlist"), api.get("/cart")]); setWishlist((unwrap(wishRes) as Product[]) ?? []); setCart(((unwrap(cartRes) as { items?: CartItem[] })?.items) ?? []); } catch { } };
+  useEffect(() => {
+    (async () => {
+      const [seen, savedUser] = await Promise.all([
+        AsyncStorage.getItem("onboarding_seen"),
+        AsyncStorage.getItem("user"),
+      ]);
+      if (!seen) setStartScreen("onboarding");
+      else if (savedUser) setStartScreen("home");
+      else setStartScreen("login");
+      setReady(true);
+    })();
+  }, []);
 
-  useEffect(() => { (async () => { const [seen, savedUser] = await Promise.all([AsyncStorage.getItem("onboarding_seen"), AsyncStorage.getItem("user")]); if (seen) setScreen(savedUser ? "home" : "login"); if (savedUser) setUser(JSON.parse(savedUser) as User); setHydrated(true); })(); }, []);
-  useEffect(() => { if (hydrated) refreshCatalog(); }, [hydrated]);
-  useEffect(() => { api.get("/settings/branding").then((response) => { const branding = unwrap(response) as { app_name?: string }; if (branding.app_name) setBrandName(branding.app_name); }).catch(() => undefined); }, []);
-  useEffect(() => { syncAccount(); }, [user]);
-  const total = useMemo(() => cart.reduce((sum, item) => sum + Number(item.sale_price ?? item.price) * item.quantity, 0), [cart]);
+  if (!ready) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator />
+      </SafeAreaView>
+    );
+  }
 
-  if (!hydrated) return <SafeAreaView style={styles.center}><ActivityIndicator color={color} /></SafeAreaView>;
-  const common = { go, cartCount: cart.reduce((sum, item) => sum + item.quantity, 0), brandName };
-  if (screen === "onboarding") return <Onboarding done={async () => { await AsyncStorage.setItem("onboarding_seen", "true"); setScreen("login"); }} />;
-  if (screen === "login" || screen === "register") return <Auth screen={screen} onSwitch={() => setScreen(screen === "login" ? "register" : "login")} onSuccess={(nextUser) => { setUser(nextUser); setHistory([]); setScreen("home"); }} />;
-  if (screen === "home") return <Home {...common} products={products} categories={categories} loading={loading} select={selectProduct} wish={toggleWish} wishlist={wishlist} />;
-  if (screen === "categories") return <Categories {...common} back={back} categories={categories} onCategory={(category: { name: string }) => goSearch(category.name)} />;
-  if (screen === "search") return <Search {...common} back={back} select={selectProduct} wish={toggleWish} wishlist={wishlist} />;
-  if (screen === "product" && selected) return <ProductDetails {...common} back={back} product={selected} add={() => addCart(selected)} wish={() => toggleWish(selected)} wished={wishlist.some((item) => item.id === selected.id)} />;
-  if (screen === "wishlist") return <ProductList {...common} back={back} title="Wishlist" products={wishlist} select={selectProduct} wish={toggleWish} wishlist={wishlist} />;
-  if (screen === "cart") return <Cart {...common} back={back} items={cart} total={total} update={updateQuantity} checkout={() => go("checkout")} />;
-  if (screen === "checkout") return <Checkout {...common} back={back} total={total} onPayment={() => go("payment")} />;
-  if (screen === "payment") return <Payment {...common} back={back} total={total} done={() => { setCart([]); go("orders"); }} />;
-  if (screen === "orders") return <Orders {...common} back={back} select={(order: Record<string, unknown>) => { setSelectedOrder(order); go("order"); }} />;
-  if (screen === "order" && selectedOrder) return <OrderDetails {...common} back={back} order={selectedOrder} track={() => go("track")} />;
-  if (screen === "track" && selectedOrder) return <Track {...common} back={back} order={selectedOrder} />;
-  if (screen === "profile") return <Profile {...common} back={back} user={user} setUser={setUser} logout={async () => { await AsyncStorage.multiRemove(["auth_token", "user"]); setUser(null); setScreen("login"); }} />;
-  if (screen === "addresses") return <Addresses {...common} back={back} />;
-  if (screen === "notifications") return <Notifications {...common} back={back} />;
-  if (screen === "settings") return <Settings {...common} back={back} />;
-  return <Support {...common} back={back} />;
-
-  function goSearch(term: string) { setSearchPrefill(term); go("search"); }
+  return (
+    <AppProvider initialScreen={startScreen}>
+      <Router />
+    </AppProvider>
+  );
 }
-
-let searchPrefill = "";
-function setSearchPrefill(value: string) { searchPrefill = value; }
-function Onboarding({ done }: { done: () => void }) { return <SafeAreaView style={styles.onboarding}><StatusBar style="light" /><Text style={styles.logo}>Ecom-app</Text><Text style={styles.heroTitle}>Everything you love, delivered.</Text><Text style={styles.heroText}>Discover curated products, seamless checkout, and reliable delivery in one place.</Text><Pressable style={styles.primary} onPress={done}><Text style={styles.primaryText}>Get started</Text></Pressable></SafeAreaView>; }
-function Auth({ screen, onSwitch, onSuccess }: { screen: "login" | "register"; onSwitch: () => void; onSuccess: (user: User) => void }) { const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [showPassword, setShowPassword] = useState(false); const [busy, setBusy] = useState(false); const submit = async () => { setBusy(true); try { const response = screen === "login" ? await api.post("/auth/login", { email_id: email, password }) : await api.post("/auth/register", { first_name: name, email_id: email, password, password_confirmation: password }); const data = unwrap(response) as { user: User; token: string }; await AsyncStorage.multiSet([["auth_token", data.token], ["user", JSON.stringify(data.user)]]); onSuccess(data.user); } catch (error) { Alert.alert(screen === "login" ? "Sign in failed" : "Registration failed", messageFrom(error)); } finally { setBusy(false); } }; const isLogin = screen === "login"; return <SafeAreaView style={styles.webAuthScreen}><View style={styles.webNav}><View style={styles.webBrand}><View style={styles.webBrandMark}><Text style={styles.webBrandLetter}>E</Text></View><Text style={styles.webBrandText}>Ecommerce</Text></View><Pressable onPress={onSwitch}><Text style={styles.webNavAction}>{isLogin ? "Sign Up" : "Sign In"}</Text></Pressable></View><ScrollView contentContainerStyle={styles.webAuthContent} keyboardShouldPersistTaps="handled"><View style={styles.webAuthCard}><View style={styles.webAuthLogo}><View style={styles.webBrandMark}><Text style={styles.webBrandLetter}>E</Text></View><Text style={styles.webBrandText}>Ecommerce</Text></View><Text style={styles.webAuthTitle}>{isLogin ? "Welcome back" : "Create account"}</Text><Text style={styles.webAuthSubtitle}>{isLogin ? "Sign in to your account" : "Join us today"}</Text>{!isLogin && <View style={styles.webField}><Text style={styles.webLabel}>Full Name</Text><TextInput style={styles.webInput} placeholder="Your name" placeholderTextColor="#9ca3af" value={name} onChangeText={setName} /></View>}<View style={styles.webField}><Text style={styles.webLabel}>Email</Text><TextInput style={styles.webInput} placeholder="you@example.com" placeholderTextColor="#9ca3af" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" /></View><View style={styles.webField}><Text style={styles.webLabel}>Password</Text><View style={styles.webPasswordWrap}><TextInput style={styles.webPasswordInput} placeholder={isLogin ? "••••••••" : "Min. 8 characters"} placeholderTextColor="#9ca3af" value={password} onChangeText={setPassword} secureTextEntry={!showPassword} /><Pressable onPress={() => setShowPassword((value) => !value)}><Text style={styles.webShowPassword}>{showPassword ? "Hide" : "Show"}</Text></Pressable></View>{isLogin && <Text style={styles.webForgot}>Forgot password?</Text>}</View><Pressable style={[styles.webSubmit, busy && styles.webDisabled]} onPress={submit} disabled={busy}><Text style={styles.webSubmitText}>{busy ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}</Text></Pressable><Text style={styles.webSwitch}>{isLogin ? "Don't have an account? " : "Already have an account? "}<Text style={styles.webSwitchLink} onPress={onSwitch}>{isLogin ? "Sign Up" : "Sign In"}</Text></Text></View></ScrollView></SafeAreaView>; }
-function Home({ go, cartCount, products, categories, loading, select }: any) { const heroImage = "https://images.unsplash.com/photo-1516257984-b1b4d707412e?auto=format&fit=crop&w=900&q=85"; return <SafeAreaView style={styles.websiteHome}><View style={styles.websiteNav}><View style={styles.webBrand}><View style={styles.webBrandMark}><Text style={styles.webBrandLetter}>E</Text></View><Text style={styles.webBrandText}>Ecommerce</Text></View><View style={styles.websiteNavLinks}><Pressable onPress={() => go("home")}><Text style={styles.websiteNavActive}>Home</Text></Pressable><Pressable onPress={() => go("categories")}><Text style={styles.websiteNavLink}>Categories</Text></Pressable></View><View style={styles.websiteNavIcons}><Pressable onPress={() => go("search")}><Text style={styles.websiteNavIcon}>⌕</Text></Pressable><Pressable onPress={() => go("cart")}><Text style={styles.websiteNavIcon}>�</Text>{cartCount > 0 && <Text style={styles.websiteCartCount}>{cartCount}</Text>}</Pressable><Pressable onPress={() => go("profile")}><Text style={styles.websiteNavIcon}>◯</Text></Pressable></View></View><ScrollView><View style={styles.websiteHero}><View style={styles.websiteHeroCopy}><Text style={styles.websiteEyebrow}>NEW COLLECTION 2025</Text><Text style={styles.websiteHeroTitle}>Fresh Arrivals{`\n`}Online</Text><Text style={styles.websiteHeroSubtitle}>Discover Our Newest Collection Today.</Text><View style={styles.websiteHeroActions}><Pressable style={styles.websiteDarkButton} onPress={() => go("search")}><Text style={styles.websiteDarkButtonText}>View Collection  →</Text></Pressable><Pressable onPress={() => go("search")}><Text style={styles.websiteBrowseLink}>Browse all</Text></Pressable></View></View><View style={styles.websiteHeroPhoto}><View style={styles.websiteSeasonTag}><Text style={styles.websiteTagLabel}>SEASON</Text><Text style={styles.websiteTagValue}>SS 2025</Text></View><Image source={{ uri: heroImage }} style={styles.websiteHeroImage} /><View style={styles.websitePriceTag}><Text style={styles.websiteTagLabelLight}>STARTING FROM</Text><Text style={styles.websitePrice}>₹999</Text></View></View></View><View style={styles.websiteFeatureStrip}><Text style={styles.websiteFeature}>✦  Free shipping over ₹999</Text><Text style={styles.websiteFeature}>↻  Easy returns</Text><Text style={styles.websiteFeature}>▣  Secure payments</Text></View><View style={styles.websiteSectionHeading}><Text style={styles.websiteEyebrow}>EXPLORE</Text><Text style={styles.websiteSectionTitle}>Shop by Category</Text></View><View style={styles.websiteCategories}>{categories.slice(0, 6).map((item: any) => <Pressable key={item.id} style={styles.websiteCategory} onPress={() => { setSearchPrefill(item.name); go("search"); }}><View style={styles.websiteCategoryImage}><Text style={styles.websiteCategorySymbol}>◇</Text></View><Text style={styles.websiteCategoryName}>{item.name}</Text></Pressable>)}</View><View style={styles.websiteSectionHeading}><Text style={styles.websiteEyebrow}>SHOP NOW</Text><Text style={styles.websiteSectionTitle}>Best Selling</Text></View>{loading ? <ActivityIndicator color="#111827" style={styles.websiteLoader} /> : <View style={styles.websiteProducts}>{products.map((item: Product) => <Pressable key={item.id} style={styles.websiteProduct} onPress={() => select(item)}><View style={styles.websiteProductImage}>{assetUrl(item.image ?? item.images?.[0]) ? <Image source={{ uri: assetUrl(item.image ?? item.images?.[0]) }} style={styles.image} /> : <Text style={styles.websiteProductPlaceholder}>{item.name}</Text>}</View><Text numberOfLines={2} style={styles.websiteProductName}>{item.name}</Text><View style={styles.websiteProductMeta}><Text style={styles.websiteStock}>IN STOCK</Text><Text style={styles.websiteProductPrice}>{money(item.sale_price ?? item.price)}</Text></View></Pressable>)}</View>}<View style={styles.websiteFooter}><Text style={styles.webBrandText}>Ecommerce</Text><Text style={styles.websiteFooterText}>Quality products, thoughtfully selected.</Text></View></ScrollView></SafeAreaView>; }
-function Categories({ go, cartCount, back, categories, onCategory }: any) { return <SafeAreaView style={styles.screen}><Header title="Categories" back={back} go={go} cartCount={cartCount} /><FlatList data={categories} numColumns={2} contentContainerStyle={styles.grid} keyExtractor={(item: any) => String(item.id)} renderItem={({ item }: any) => <Pressable style={styles.categoryLarge} onPress={() => onCategory(item)}><Text style={styles.categoryIcon}>◈</Text><Text>{item.name}</Text></Pressable>} /></SafeAreaView>; }
-function Search({ go, cartCount, back, select, wish, wishlist }: any) { const [query, setQuery] = useState(searchPrefill); const [items, setItems] = useState<Product[]>([]); const [busy, setBusy] = useState(false); const find = async (value = query) => { setBusy(true); try { const response = await api.get("/products/search", { params: { q: value } }); const data = unwrap(response) as { data?: Product[] } | Product[]; setItems(Array.isArray(data) ? data : data?.data ?? []); } catch (error) { Alert.alert("Search", messageFrom(error)); } finally { setBusy(false); } }; useEffect(() => { if (query) find(query); }, []); return <SafeAreaView style={styles.screen}><Header title="Search" back={back} go={go} cartCount={cartCount} /><View style={styles.searchInput}><TextInput value={query} placeholder="Search products" onChangeText={setQuery} onSubmitEditing={() => find()} /><Pressable onPress={() => find()}><Text>Search</Text></Pressable></View>{busy ? <ActivityIndicator color={color} /> : <FlatList data={items} numColumns={2} contentContainerStyle={styles.grid} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <ProductCard item={item} onPress={() => select(item)} onWish={() => wish(item)} wished={wishlist.some((saved: Product) => saved.id === item.id)} />} />}</SafeAreaView>; }
-function ProductDetails({ go, cartCount, back, product, add, wish, wished }: any) { const image = assetUrl(product.image ?? product.images?.[0]); return <SafeAreaView style={styles.screen}><Header title="Product" back={back} go={go} cartCount={cartCount} /><ScrollView><View style={styles.detailImage}>{image ? <Image source={{ uri: image }} style={styles.image} /> : <Text style={styles.placeholder}>Product image</Text>}</View><View style={styles.detail}><Text style={styles.muted}>{product.category?.name ?? "Featured"}</Text><Text style={styles.detailName}>{product.name}</Text><Text style={styles.detailPrice}>{money(product.sale_price ?? product.price)}</Text><Text style={styles.description}>{product.short_description ?? "Quality products selected especially for you."}</Text><View style={styles.actionRow}><Pressable style={styles.outline} onPress={wish}><Text>{wished ? "♥ Saved" : "♡ Wishlist"}</Text></Pressable><Pressable style={[styles.primary, styles.flex]} onPress={add}><Text style={styles.primaryText}>Add to cart</Text></Pressable></View></View></ScrollView></SafeAreaView>; }
-function ProductList({ go, cartCount, back, title, products, select, wish, wishlist }: any) { return <SafeAreaView style={styles.screen}><Header title={title} back={back} go={go} cartCount={cartCount} /><FlatList data={products} numColumns={2} contentContainerStyle={styles.grid} ListEmptyComponent={<Empty title={`Your ${title.toLowerCase()} is empty`} />} keyExtractor={(item: Product) => String(item.id)} renderItem={({ item }: { item: Product }) => <ProductCard item={item} onPress={() => select(item)} onWish={() => wish(item)} wished={wishlist.some((saved: Product) => saved.id === item.id)} />} /></SafeAreaView>; }
-function Cart({ go, cartCount, back, items, total, update, checkout }: any) { return <SafeAreaView style={styles.screen}><Header title="Cart" back={back} go={go} cartCount={cartCount} /><FlatList data={items} keyExtractor={(item: CartItem) => String(item.id)} contentContainerStyle={styles.list} ListEmptyComponent={<Empty title="Your cart is empty" />} renderItem={({ item }: { item: CartItem }) => <View style={styles.cartItem}><Text style={styles.cartName}>{item.name}</Text><Text style={styles.price}>{money(item.sale_price ?? item.price)}</Text><View style={styles.qty}><Pressable onPress={() => update(item, item.quantity - 1)}><Text>−</Text></Pressable><Text>{item.quantity}</Text><Pressable onPress={() => update(item, item.quantity + 1)}><Text>＋</Text></Pressable></View></View>} ListFooterComponent={items.length ? <View style={styles.summary}><Text style={styles.total}>Total: {money(total)}</Text><Pressable style={styles.primary} onPress={checkout}><Text style={styles.primaryText}>Proceed to checkout</Text></Pressable></View> : null} /></SafeAreaView>; }
-function Checkout({ go, cartCount, back, total, onPayment }: any) { const [address, setAddress] = useState(""); return <SafeAreaView style={styles.screen}><Header title="Checkout" back={back} go={go} cartCount={cartCount} /><ScrollView contentContainerStyle={styles.form}><Text style={styles.sectionTitle}>Delivery address</Text><Input placeholder="Full delivery address" value={address} onChangeText={setAddress} multiline /><Text style={styles.sectionTitle}>Payment method</Text><View style={styles.option}><Text>Cash on delivery / Razorpay</Text></View><Text style={styles.total}>Payable: {money(total)}</Text><Pressable style={styles.primary} onPress={() => address ? onPayment() : Alert.alert("Address required", "Enter your delivery address first.")}><Text style={styles.primaryText}>Continue to payment</Text></Pressable></ScrollView></SafeAreaView>; }
-function Payment({ go, cartCount, back, total, done }: any) { return <SafeAreaView style={styles.screen}><Header title="Payment" back={back} go={go} cartCount={cartCount} /><View style={styles.center}><Text style={styles.authTitle}>Secure payment</Text><Text style={styles.description}>Amount payable: {money(total)}</Text><Text style={styles.muted}>Connect Razorpay checkout in a production development build before release.</Text><Pressable style={styles.primary} onPress={done}><Text style={styles.primaryText}>Confirm payment</Text></Pressable></View></SafeAreaView>; }
-function Orders({ go, cartCount, back, select }: any) { const [orders, setOrders] = useState<any[]>([]); useEffect(() => { api.get("/orders").then((res) => { const data = unwrap(res) as any; setOrders(Array.isArray(data) ? data : data?.data ?? []); }).catch(() => undefined); }, []); return <SafeAreaView style={styles.screen}><Header title="My orders" back={back} go={go} cartCount={cartCount} /><FlatList data={orders} contentContainerStyle={styles.list} ListEmptyComponent={<Empty title="No orders yet" />} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <Pressable style={styles.orderCard} onPress={() => select(item)}><Text style={styles.orderTitle}>Order #{item.order_number ?? item.id}</Text><Text style={styles.muted}>{item.status ?? "Processing"}</Text><Text style={styles.price}>{money(item.grand_total ?? item.total)}</Text></Pressable>} /></SafeAreaView>; }
-function OrderDetails({ go, cartCount, back, order, track }: any) { return <SafeAreaView style={styles.screen}><Header title="Order details" back={back} go={go} cartCount={cartCount} /><ScrollView contentContainerStyle={styles.form}><Text style={styles.orderTitle}>Order #{String(order.order_number ?? order.id)}</Text><Text style={styles.price}>{money(order.grand_total ?? order.total)}</Text><Text style={styles.muted}>Status: {String(order.status ?? "Processing")}</Text><Pressable style={styles.primary} onPress={track}><Text style={styles.primaryText}>Track order</Text></Pressable></ScrollView></SafeAreaView>; }
-function Track({ go, cartCount, back, order }: any) { return <SafeAreaView style={styles.screen}><Header title="Track order" back={back} go={go} cartCount={cartCount} /><View style={styles.timeline}><Text style={styles.timelineActive}>● Order confirmed</Text><Text style={styles.timelineActive}>● Preparing your order</Text><Text style={styles.timelineMuted}>○ Shipped</Text><Text style={styles.timelineMuted}>○ Delivered</Text><Text style={styles.muted}>Order #{String(order.order_number ?? order.id)}</Text></View></SafeAreaView>; }
-function Profile({ go, cartCount, back, user, setUser, logout }: any) { const [name, setName] = useState(user?.first_name ?? ""); const save = async () => { try { const response = await api.put("/me", { first_name: name }); const updated = unwrap(response) as User; setUser(updated); await AsyncStorage.setItem("user", JSON.stringify(updated)); Alert.alert("Profile", "Saved successfully."); } catch (error) { Alert.alert("Profile", messageFrom(error)); } }; return <SafeAreaView style={styles.screen}><Header title="Profile" back={back} go={go} cartCount={cartCount} /><ScrollView contentContainerStyle={styles.form}><Input placeholder="Name" value={name} onChangeText={setName} /><Input placeholder="Email" value={user?.email_id ?? ""} editable={false} /><Pressable style={styles.primary} onPress={save}><Text style={styles.primaryText}>Save profile</Text></Pressable><Menu label="Addresses" onPress={() => go("addresses")} /><Menu label="Notifications" onPress={() => go("notifications")} /><Menu label="Settings" onPress={() => go("settings")} /><Menu label="Contact support" onPress={() => go("support")} /><Pressable style={styles.logout} onPress={logout}><Text>Sign out</Text></Pressable></ScrollView><Nav go={go} active="profile" /></SafeAreaView>; }
-function Addresses({ go, cartCount, back }: any) { const [items, setItems] = useState<any[]>([]); const [address, setAddress] = useState(""); const load = () => api.get("/addresses").then((res) => setItems((unwrap(res) as any[]) ?? [])).catch(() => undefined); useEffect(() => { void load(); }, []); const add = async () => { try { await api.post("/addresses", { address_line_1: address, city: "", state: "", postal_code: "", country: "India", phone: "" }); setAddress(""); load(); } catch (error) { Alert.alert("Address", messageFrom(error)); } }; return <SafeAreaView style={styles.screen}><Header title="Addresses" back={back} go={go} cartCount={cartCount} /><View style={styles.form}><Input placeholder="Address line" value={address} onChangeText={setAddress} /><Pressable style={styles.primary} onPress={add}><Text style={styles.primaryText}>Add address</Text></Pressable>{items.map((item) => <View key={item.id} style={styles.option}><Text>{item.address_line_1}</Text></View>)}</View></SafeAreaView>; }
-function Notifications({ go, cartCount, back }: any) { const [items, setItems] = useState<any[]>([]); useEffect(() => { api.get("/notifications").then((res) => setItems((unwrap(res) as any[]) ?? [])).catch(() => undefined); }, []); return <SafeAreaView style={styles.screen}><Header title="Notifications" back={back} go={go} cartCount={cartCount} /><FlatList data={items} contentContainerStyle={styles.list} ListEmptyComponent={<Empty title="You're all caught up" />} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <View style={styles.option}><Text style={styles.orderTitle}>{item.title}</Text><Text>{item.message}</Text></View>} /></SafeAreaView>; }
-function Settings({ go, cartCount, back }: any) { return <SafeAreaView style={styles.screen}><Header title="Settings" back={back} go={go} cartCount={cartCount} /><View style={styles.list}><Menu label="App preferences" onPress={() => Alert.alert("Settings", "Preferences are saved on this device.")} /><Menu label="Privacy policy" onPress={() => Alert.alert("Privacy", "Open your website privacy-policy page here.")} /><Menu label="Terms & conditions" onPress={() => Alert.alert("Terms", "Open your website terms-conditions page here.")} /></View></SafeAreaView>; }
-function Support({ go, cartCount, back }: any) { const [message, setMessage] = useState(""); const send = async () => { try { await api.post("/contact", { message }); Alert.alert("Support", "Your message has been sent."); setMessage(""); } catch (error) { Alert.alert("Support", messageFrom(error)); } }; return <SafeAreaView style={styles.screen}><Header title="Contact support" back={back} go={go} cartCount={cartCount} /><View style={styles.form}><Text style={styles.description}>Tell us how we can help.</Text><Input placeholder="Your message" value={message} onChangeText={setMessage} multiline /><Pressable style={styles.primary} onPress={send}><Text style={styles.primaryText}>Send message</Text></Pressable></View></SafeAreaView>; }
-function Input(props: any) { return <TextInput {...props} style={[styles.input, props.multiline && styles.textarea]} placeholderTextColor="#8490a3" />; }
-function Section({ title, action }: { title: string; action: () => void }) { return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text><Pressable onPress={action}><Text style={styles.link}>See all</Text></Pressable></View>; }
-function Empty({ title }: { title: string }) { return <View style={styles.empty}><Text style={styles.muted}>{title}</Text></View>; }
-function Menu({ label, onPress }: { label: string; onPress: () => void }) { return <Pressable style={styles.menu} onPress={onPress}><Text>{label}</Text><Text>›</Text></Pressable>; }
-function Nav({ go, active }: { go: (screen: Screen) => void; active: string }) { return <View style={styles.nav}><Pressable onPress={() => go("home")}><Text style={active === "home" ? styles.navActive : styles.navItem}>⌂{`\n`}Home</Text></Pressable><Pressable onPress={() => go("categories")}><Text style={styles.navItem}>▦{`\n`}Categories</Text></Pressable><Pressable onPress={() => go("wishlist")}><Text style={styles.navItem}>♡{`\n`}Wishlist</Text></Pressable><Pressable onPress={() => go("profile")}><Text style={active === "profile" ? styles.navActive : styles.navItem}>◉{`\n`}Profile</Text></Pressable></View>; }
-
-const styles = StyleSheet.create({ websiteHome: { flex: 1, backgroundColor: "#fff" }, websiteNav: { height: 64, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderColor: "#e5e7eb", justifyContent: "space-between" }, websiteNavLinks: { flexDirection: "row", gap: 18, alignItems: "center" }, websiteNavActive: { color: "#111827", fontSize: 13, fontWeight: "800" }, websiteNavLink: { color: "#4b5563", fontSize: 13, fontWeight: "600" }, websiteNavIcons: { flexDirection: "row", alignItems: "center", gap: 11 }, websiteNavIcon: { color: "#111827", fontSize: 19 }, websiteCartCount: { position: "absolute", top: -9, right: -7, minWidth: 15, height: 15, borderRadius: 8, color: "#fff", backgroundColor: "#111827", textAlign: "center", fontSize: 10, overflow: "hidden" }, websiteHero: { minHeight: 520, flexDirection: "row", backgroundColor: "#fff" }, websiteHeroCopy: { flex: 1.05, paddingHorizontal: 24, paddingVertical: 58, justifyContent: "center" }, websiteEyebrow: { color: "#9ca3af", fontSize: 10, fontWeight: "800", letterSpacing: 2.2, marginBottom: 14 }, websiteHeroTitle: { color: "#111827", fontSize: 35, fontWeight: "800", lineHeight: 42, letterSpacing: -1.1 }, websiteHeroSubtitle: { color: "#6b7280", fontSize: 14, lineHeight: 21, marginTop: 19, maxWidth: 210 }, websiteHeroActions: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 30 }, websiteDarkButton: { backgroundColor: "#111827", paddingHorizontal: 16, paddingVertical: 14 }, websiteDarkButtonText: { color: "#fff", fontSize: 12, fontWeight: "800" }, websiteBrowseLink: { color: "#4b5563", fontSize: 12, textDecorationLine: "underline" }, websiteHeroPhoto: { flex: 0.9, backgroundColor: "#f3f4f6", position: "relative", overflow: "hidden" }, websiteHeroImage: { width: "100%", height: "100%", resizeMode: "cover" }, websiteSeasonTag: { position: "absolute", top: 20, left: 10, zIndex: 1, backgroundColor: "#fff", paddingHorizontal: 9, paddingVertical: 8 }, websiteTagLabel: { color: "#9ca3af", fontSize: 7, fontWeight: "800", letterSpacing: 1.1 }, websiteTagValue: { color: "#111827", fontSize: 11, fontWeight: "800", marginTop: 2 }, websitePriceTag: { position: "absolute", bottom: 20, right: 10, zIndex: 1, backgroundColor: "#111827", paddingHorizontal: 11, paddingVertical: 9 }, websiteTagLabelLight: { color: "#aeb4be", fontSize: 7, fontWeight: "800", letterSpacing: 1 }, websitePrice: { color: "#fff", fontSize: 16, fontWeight: "800", marginTop: 2 }, websiteFeatureStrip: { backgroundColor: "#f9fafb", paddingHorizontal: 16, paddingVertical: 17, flexDirection: "row", justifyContent: "space-between", gap: 8 }, websiteFeature: { flex: 1, color: "#4b5563", fontSize: 10, fontWeight: "700", textAlign: "center", lineHeight: 16 }, websiteSectionHeading: { alignItems: "center", paddingTop: 46, paddingHorizontal: 16, paddingBottom: 22 }, websiteSectionTitle: { color: "#111827", fontSize: 26, fontWeight: "800" }, websiteCategories: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 14, gap: 10 }, websiteCategory: { width: "30%", alignItems: "center", marginBottom: 14 }, websiteCategoryImage: { backgroundColor: "#f3f4f6", height: 88, width: "100%", justifyContent: "center", alignItems: "center" }, websiteCategorySymbol: { color: "#9ca3af", fontSize: 30 }, websiteCategoryName: { color: "#111827", fontSize: 12, fontWeight: "700", textAlign: "center", marginTop: 9 }, websiteLoader: { marginVertical: 35 }, websiteProducts: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 12, gap: 10 }, websiteProduct: { width: "47%", marginBottom: 22 }, websiteProductImage: { aspectRatio: 0.75, backgroundColor: "#f3f4f6", overflow: "hidden", justifyContent: "center" }, websiteProductPlaceholder: { textAlign: "center", paddingHorizontal: 14, color: "#9ca3af", fontSize: 12 }, websiteProductName: { color: "#111827", fontSize: 13, fontWeight: "700", marginTop: 10, minHeight: 35 }, websiteProductMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }, websiteStock: { borderWidth: 1, borderColor: "#d1d5db", color: "#4b5563", fontSize: 8, paddingHorizontal: 6, paddingVertical: 3 }, websiteProductPrice: { color: "#111827", fontSize: 12, fontWeight: "800" }, websiteFooter: { backgroundColor: "#111827", marginTop: 25, padding: 28, alignItems: "center" }, websiteFooterText: { color: "#9ca3af", fontSize: 12, marginTop: 8 }, webAuthScreen: { flex: 1, backgroundColor: "#fff" }, webNav: { height: 64, paddingHorizontal: 20, borderBottomWidth: 1, borderColor: "#e5e7eb", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, webBrand: { flexDirection: "row", alignItems: "center", gap: 8 }, webBrandMark: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#111827", justifyContent: "center", alignItems: "center" }, webBrandLetter: { color: "#fff", fontWeight: "800", fontSize: 13 }, webBrandText: { color: "#111827", fontSize: 20, fontWeight: "800" }, webNavAction: { color: "#111827", fontWeight: "700", fontSize: 14 }, webAuthContent: { flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 24 }, webAuthCard: { width: "100%", maxWidth: 360 }, webAuthLogo: { alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8, marginBottom: 30 }, webAuthTitle: { color: "#111827", fontSize: 25, fontWeight: "800", textAlign: "center", marginBottom: 5 }, webAuthSubtitle: { color: "#6b7280", fontSize: 14, textAlign: "center", marginBottom: 28 }, webField: { marginBottom: 17 }, webLabel: { color: "#374151", fontSize: 14, fontWeight: "600", marginBottom: 7 }, webInput: { height: 48, color: "#111827", borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 5, paddingHorizontal: 15, fontSize: 14, backgroundColor: "#fff" }, webPasswordWrap: { height: 48, borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 5, flexDirection: "row", alignItems: "center", paddingLeft: 15, paddingRight: 13 }, webPasswordInput: { flex: 1, color: "#111827", fontSize: 14 }, webShowPassword: { color: "#6b7280", fontSize: 12, fontWeight: "600" }, webForgot: { color: "#6b7280", fontSize: 12, textAlign: "right", marginTop: 8 }, webSubmit: { height: 48, backgroundColor: "#111827", borderRadius: 5, justifyContent: "center", alignItems: "center", marginTop: 7 }, webDisabled: { opacity: 0.5 }, webSubmitText: { color: "#fff", fontSize: 14, fontWeight: "700" }, webSwitch: { color: "#6b7280", fontSize: 14, textAlign: "center", marginTop: 22 }, webSwitchLink: { color: "#111827", fontWeight: "800", textDecorationLine: "underline" }, screen: { flex: 1, backgroundColor: "#fff" }, center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24, gap: 18 }, logo: { color: "#fff", fontWeight: "900", fontSize: 44, marginBottom: 80 }, heroTitle: { color: "#fff", fontSize: 38, fontWeight: "800", lineHeight: 46 }, heroText: { color: "#e4e0ff", fontSize: 17, lineHeight: 26, marginVertical: 20 }, primary: { backgroundColor: color, padding: 16, borderRadius: 12, alignItems: "center", marginTop: 14 }, onboarding: { flex: 1, justifyContent: "center", backgroundColor: color, padding: 30 }, primaryText: { color: "#fff", fontWeight: "700" }, auth: { flex: 1, justifyContent: "center", padding: 26, gap: 8, backgroundColor: "#fff" }, authLogo: { fontSize: 35, fontWeight: "900", color, marginBottom: 26 }, authTitle: { fontSize: 28, fontWeight: "800", color: "#1d2533", marginBottom: 15 }, input: { backgroundColor: "#f5f6fa", borderRadius: 12, padding: 15, fontSize: 16, color: "#1d2533", marginTop: 10 }, textarea: { minHeight: 120, textAlignVertical: "top" }, link: { color, fontWeight: "600", textAlign: "center", marginTop: 12 }, header: { height: 60, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, borderBottomWidth: 1, borderColor: "#f1f2f5" }, brand: { color, fontWeight: "900", fontSize: 19, width: 42 }, headerTitle: { fontSize: 18, fontWeight: "700" }, back: { fontSize: 38, lineHeight: 35, width: 42 }, cart: { fontSize: 13, width: 58 }, searchRow: { flexDirection: "row", gap: 15, alignItems: "center", padding: 16 }, searchBox: { flex: 1, backgroundColor: "#f4f5f8", padding: 14, borderRadius: 12 }, searchInput: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#f4f5f8", borderRadius: 12, paddingHorizontal: 14, margin: 16 },  icon: { fontSize: 20 }, banner: { backgroundColor: "#1d2533", margin: 16, borderRadius: 18, padding: 24, minHeight: 170, justifyContent: "center" }, bannerKicker: { color: "#ab9eff", fontWeight: "700", fontSize: 12 }, bannerTitle: { color: "#fff", fontSize: 27, fontWeight: "800", maxWidth: 210, marginVertical: 7 }, lightButton: { backgroundColor: "#fff", padding: 10, borderRadius: 9, alignSelf: "flex-start" }, section: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, marginTop: 12 }, sectionTitle: { fontSize: 19, fontWeight: "800", color: "#1d2533" }, categoryScroll: { paddingHorizontal: 12, gap: 10, paddingTop: 14 }, category: { width: 84, alignItems: "center", gap: 8 }, categoryIcon: { width: 54, height: 54, textAlign: "center", textAlignVertical: "center", backgroundColor: "#f0edff", borderRadius: 27, color, fontSize: 25 }, grid: { padding: 12, gap: 12 }, card: { width: "47%", margin: "1.5%" }, productImage: { height: 150, backgroundColor: "#f4f5f8", borderRadius: 12, overflow: "hidden", position: "relative" }, image: { width: "100%", height: "100%", resizeMode: "cover" }, placeholder: { color: "#8490a3", textAlign: "center", marginTop: 65 }, heart: { position: "absolute", right: 9, top: 9, backgroundColor: "#fff", borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3 }, productName: { color: "#1d2533", fontWeight: "600", marginTop: 8, minHeight: 37 }, price: { color, fontWeight: "800", marginTop: 3 }, bottomSpace: { height: 75 }, nav: { position: "absolute", bottom: 0, left: 0, right: 0, height: 64, backgroundColor: "#fff", borderTopWidth: 1, borderColor: "#eef0f4", flexDirection: "row", justifyContent: "space-around", alignItems: "center" }, navItem: { textAlign: "center", color: "#6b7482", fontSize: 11 }, navActive: { textAlign: "center", color, fontSize: 11, fontWeight: "800" }, categoryLarge: { width: "47%", height: 130, margin: "1.5%", justifyContent: "center", alignItems: "center", gap: 10, backgroundColor: "#f8f8fc", borderRadius: 14 }, detailImage: { height: 320, backgroundColor: "#f4f5f8" }, detail: { padding: 20 }, muted: { color: "#758094", lineHeight: 22 }, detailName: { fontSize: 25, color: "#1d2533", fontWeight: "800", marginTop: 7 }, detailPrice: { fontSize: 21, color, fontWeight: "800", marginTop: 8 }, description: { color: "#536073", lineHeight: 23, marginTop: 18 }, actionRow: { flexDirection: "row", gap: 10, marginTop: 15 }, outline: { borderWidth: 1, borderColor: color, padding: 16, borderRadius: 12, alignItems: "center" }, flex: { flex: 1, marginTop: 0 }, list: { padding: 16, gap: 12 }, empty: { alignItems: "center", padding: 50 }, cartItem: { padding: 16, backgroundColor: "#f8f8fc", borderRadius: 14 }, cartName: { fontWeight: "700", fontSize: 16, color: "#1d2533" }, qty: { flexDirection: "row", gap: 20, alignItems: "center", marginTop: 12 }, summary: { marginTop: 10 }, total: { fontSize: 18, fontWeight: "800", color: "#1d2533", marginTop: 16 }, form: { padding: 20, gap: 8 }, option: { padding: 16, borderRadius: 12, backgroundColor: "#f7f7fa", marginTop: 10 }, orderCard: { backgroundColor: "#f7f7fa", borderRadius: 14, padding: 16 }, orderTitle: { fontWeight: "800", color: "#1d2533", fontSize: 16 }, timeline: { padding: 32, gap: 25 }, timelineActive: { color: color, fontWeight: "700" }, timelineMuted: { color: "#9aa2ae" }, menu: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 18, borderBottomWidth: 1, borderColor: "#edf0f4" }, logout: { padding: 16, marginTop: 20, alignItems: "center", borderRadius: 12, backgroundColor: "#ffefef" } });
