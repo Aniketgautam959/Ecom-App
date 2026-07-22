@@ -108,7 +108,7 @@ export function Auth({ mode }: { mode: "login" | "register" | "forgot-password" 
 
   return (
     <SafeAreaView style={styles.flex}>
-      <WebHeader go={go} cartCount={0} />
+      <WebHeader go={go} cartCount={0} showNav={false} />
       <ScrollView contentContainerStyle={[styles.form, { paddingTop: 24 }]} keyboardShouldPersistTaps="handled">
         <View style={styles.center}>
           <View style={styles.webBrandMark}>
