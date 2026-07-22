@@ -100,6 +100,8 @@ export function Auth({ mode }: { mode: "login" | "register" | "forgot-password" 
         setTimeout(() => switchMode("login"), 1500);
       }
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[Auth error]", err);
       setError(messageFrom(err));
     } finally {
       setLoading(false);
