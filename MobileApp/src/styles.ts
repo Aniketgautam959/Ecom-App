@@ -10,7 +10,8 @@ export const colors = {
   text: "#111827",
   textMuted: "#6B7280",
   textLight: "#9CA3AF",
-  success: "#22C55E",
+  success: "#16A34A",
+  successLight: "#F0FDF4",
   error: "#EF4444",
 };
 
@@ -372,4 +373,4 @@ export const statusColors: Record<string, { bg: string; text: string }> = {
 };
 
 export const money = (value: number | string | null | undefined) =>
-  `₹${Number(value ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+  `₹ ${Number(value ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;

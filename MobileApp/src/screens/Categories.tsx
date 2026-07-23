@@ -1,8 +1,9 @@
 import { FlatList, Image, Pressable, SafeAreaView, Text, View } from "react-native";
+import Feather from "@expo/vector-icons/Feather";
 import { assetUrl } from "../api";
 import { Header } from "../components/Header";
 import { useApp } from "../context/AppContext";
-import { styles } from "../styles";
+import { colors, styles } from "../styles";
 import type { Category } from "../types";
 
 export function Categories({ back }: { back: () => void }) {
@@ -28,7 +29,7 @@ export function Categories({ back }: { back: () => void }) {
                 {item.image ? (
                   <Image source={{ uri: assetUrl(item.image) }} style={styles.image} resizeMode="cover" />
                 ) : (
-                  <Text style={styles.placeholder}>Category</Text>
+                  <Feather name="grid" size={32} color={colors.textLight} />
                 )}
               </View>
               <View style={styles.cardBody}>
@@ -39,7 +40,12 @@ export function Categories({ back }: { back: () => void }) {
             </View>
           </Pressable>
         )}
-        ListEmptyComponent={<Text style={{ textAlign: "center", margin: 24, color: "#6B7280" }}>No categories.</Text>}
+        ListEmptyComponent={
+          <View style={{ alignItems: "center", paddingVertical: 60 }}>
+            <Feather name="grid" size={48} color={colors.mutedDark} style={{ marginBottom: 16 }} />
+            <Text style={{ color: colors.textLight }}>No categories found.</Text>
+          </View>
+        }
       />
     </SafeAreaView>
   );

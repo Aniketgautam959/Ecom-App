@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Feather from "@expo/vector-icons/Feather";
 import { useState } from "react";
 import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 import { api, messageFrom, unwrap } from "../api";
@@ -138,64 +139,86 @@ export function Auth({ mode }: { mode: "login" | "register" | "forgot-password" 
         )}
 
         {isRegister && (
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-          />
+          <View>
+            <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text, marginBottom: 4 }}>Full Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Your name"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+            />
+          </View>
         )}
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        {isReset && (
+        <View>
+          <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text, marginBottom: 4 }}>Email</Text>
           <TextInput
             style={styles.input}
-            placeholder="Reset token"
-            value={token}
-            onChangeText={setToken}
+            placeholder="you@example.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
             autoCapitalize="none"
           />
+        </View>
+
+        {isReset && (
+          <View>
+            <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text, marginBottom: 4 }}>Reset Token</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Reset token"
+              value={token}
+              onChangeText={setToken}
+              autoCapitalize="none"
+            />
+          </View>
         )}
 
         {(isLogin || isRegister || isReset) && (
           <View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text }}>{isReset ? "New Password" : "Password"}</Text>
+              {isLogin && (
+                <Pressable onPress={() => switchMode("forgot-password")}>
+                  <Text style={[styles.link, { fontSize: 12 }]}>Forgot password?</Text>
+                </Pressable>
+              )}
+            </View>
             <View style={[styles.row, styles.input]}>
               <TextInput
                 style={styles.flex}
-                placeholder={isReset ? "New Password" : "Password"}
+                placeholder={isReset ? "Min. 8 characters" : "••••••••"}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
               />
               <Pressable onPress={() => setShowPassword(!showPassword)}>
-                <Text style={{ color: colors.textLight }}>{showPassword ? "Hide" : "Show"}</Text>
+                <Feather name={showPassword ? "eye-off" : "eye"} size={18} color={colors.textLight} />
               </Pressable>
             </View>
           </View>
         )}
 
         {(isRegister || isReset) && (
-          <View style={[styles.row, styles.input]}>
-            <TextInput
-              style={styles.flex}
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirm}
-              autoCapitalize="none"
-            />
-            <Pressable onPress={() => setShowConfirm(!showConfirm)}>
-              <Text style={{ color: colors.textLight }}>{showConfirm ? "Hide" : "Show"}</Text>
-            </Pressable>
+          <View>
+            <Text style={{ fontSize: 12, fontWeight: "500", color: colors.text, marginBottom: 4 }}>
+              {isReset ? "Confirm New Password" : "Confirm Password"}
+            </Text>
+            <View style={[styles.row, styles.input]}>
+              <TextInput
+                style={styles.flex}
+                placeholder="Repeat new password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirm}
+                autoCapitalize="none"
+              />
+              <Pressable onPress={() => setShowConfirm(!showConfirm)}>
+                <Feather name={showConfirm ? "eye-off" : "eye"} size={18} color={colors.textLight} />
+              </Pressable>
+            </View>
           </View>
         )}
 
@@ -228,11 +251,6 @@ export function Auth({ mode }: { mode: "login" | "register" | "forgot-password" 
             </Pressable>
           )}
         </View>
-        {isLogin && (
-          <Pressable onPress={() => switchMode("forgot-password")} style={{ alignSelf: "center" }}>
-            <Text style={[styles.link, { fontSize: 12 }]}>Forgot password?</Text>
-          </Pressable>
-        )}
       </ScrollView>
     </SafeAreaView>
   );

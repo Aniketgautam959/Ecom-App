@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
-import { api, messageFrom, unwrap } from "../api";
+import Feather from "@expo/vector-icons/Feather";
+import { Alert, Image, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
+import { api, assetUrl, messageFrom, unwrap } from "../api";
 import { Header } from "../components/Header";
 import { useApp } from "../context/AppContext";
 import { colors, money, styles } from "../styles";
@@ -13,7 +14,7 @@ export function Checkout({ back }: { back: () => void }) {
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
-  const [payment, setPayment] = useState<"cod" | "razorpay" | "card">("cod");
+  const [payment, setPayment] = useState<"cod" | "razorpay">("cod");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -94,10 +95,14 @@ export function Checkout({ back }: { back: () => void }) {
           </View>
         )}
 
-        <Text style={styles.subheading}>Delivery Address</Text>
+        <View style={[styles.row, { alignItems: "center", gap: 8, marginBottom: 12 }]}>
+          <Feather name="truck" size={16} color={colors.text} />
+          <Text style={styles.subheading}>Delivery Address</Text>
+        </View>
         {addresses.length === 0 && (
-          <Pressable style={[styles.option, { borderStyle: "dashed" }]} onPress={() => go("addresses")}>
-            <Text style={styles.link}>+ Add new address</Text>
+          <Pressable style={[styles.option, { borderStyle: "dashed", flexDirection: "row", alignItems: "center", gap: 8 }]} onPress={() => go("addresses")}>
+            <Feather name="plus" size={14} color={colors.primary} />
+            <Text style={styles.link}>Add new address</Text>
           </Pressable>
         )}
         {addresses.map((address) => (
@@ -115,15 +120,18 @@ export function Checkout({ back }: { back: () => void }) {
           </Pressable>
         ))}
 
-        <Text style={styles.subheading}>Payment Method</Text>
-        {(["cod", "razorpay", "card"] as const).map((method) => (
+        <View style={[styles.row, { alignItems: "center", gap: 8, marginBottom: 12 }]}>
+          <Feather name="credit-card" size={16} color={colors.text} />
+          <Text style={styles.subheading}>Payment Method</Text>
+        </View>
+        {(["cod", "razorpay"] as const).map((method) => (
           <Pressable
             key={method}
             style={[styles.option, payment === method && styles.optionActive]}
             onPress={() => setPayment(method)}
           >
             <Text style={styles.optionTitle}>
-              {method === "cod" ? "Cash on Delivery" : method === "razorpay" ? "Razorpay" : "Credit / Debit Card"}
+              {method === "cod" ? "Cash on Delivery" : "Razorpay (UPI/Card/Netbanking)"}
             </Text>
           </Pressable>
         ))}
@@ -147,6 +155,24 @@ export function Checkout({ back }: { back: () => void }) {
 
         <View style={styles.webCard}>
           <Text style={styles.subheading}>Summary</Text>
+          <View style={{ gap: 12, marginBottom: 16 }}>
+            {cart.map((item) => {
+              const image = assetUrl(item.image ?? item.main_image ?? item.images?.[0]);
+              const itemTotal = Number(item.sale_price ?? item.price) * item.quantity;
+              return (
+                <View key={`${item.id}-${item.size ?? ""}-${item.color ?? ""}`} style={[styles.row, { gap: 12, alignItems: "center" }]}>
+                  <View style={{ width: 48, height: 48, backgroundColor: colors.muted, borderRadius: 4, overflow: "hidden" }}>
+                    {image ? <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" /> : null}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 12, color: colors.text }} numberOfLines={1}>{item.name}</Text>
+                    <Text style={{ fontSize: 11, color: colors.textLight }}>Qty: {item.quantity} {item.size ? `• ${item.size}` : ""}</Text>
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text }}>{money(itemTotal)}</Text>
+                </View>
+              );
+            })}
+          </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Subtotal</Text>
             <Text style={styles.summaryValue}>{money(cartTotal)}</Text>

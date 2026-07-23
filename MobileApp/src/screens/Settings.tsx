@@ -1,8 +1,9 @@
 import { useState } from "react";
+import Feather from "@expo/vector-icons/Feather";
 import { Pressable, SafeAreaView, ScrollView, Switch, Text, View } from "react-native";
 import { Header } from "../components/Header";
 import { useApp } from "../context/AppContext";
-import { styles } from "../styles";
+import { colors, styles } from "../styles";
 
 export function Settings({ back }: { back: () => void }) {
   const { go, cartCount, user, logout } = useApp();
@@ -26,23 +27,23 @@ export function Settings({ back }: { back: () => void }) {
         <Text style={[styles.subheading, { marginTop: 24 }]}>Information</Text>
         <Pressable style={styles.menuItem} onPress={() => go("about")}>
           <Text style={styles.menuText}>About Us</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("contact")}>
           <Text style={styles.menuText}>Contact</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("faq")}>
           <Text style={styles.menuText}>FAQ</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("privacy-policy")}>
           <Text style={styles.menuText}>Privacy Policy</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("terms-conditions")}>
           <Text style={styles.menuText}>Terms & Conditions</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
 
         {user && (

@@ -1,4 +1,6 @@
+import Feather from "@expo/vector-icons/Feather";
 import { Pressable, Text, View } from "react-native";
+import { useApp } from "../context/AppContext";
 import { colors, styles } from "../styles";
 import type { Screen } from "../types";
 
@@ -7,13 +9,17 @@ export function WebHeader({
   cartCount,
   showNav = true,
 }: {
-  go: (screen: Screen) => void;
-  cartCount: number;
+  go?: (screen: Screen) => void;
+  cartCount?: number;
   showNav?: boolean;
 }) {
+  const { go: ctxGo, cartCount: ctxCartCount } = useApp();
+  const navigate = go ?? ctxGo;
+  const count = cartCount ?? ctxCartCount;
+
   return (
     <View style={styles.webNav}>
-      <Pressable style={styles.webBrand} onPress={() => go("home")}>
+      <Pressable style={styles.webBrand} onPress={() => navigate("home")}>
         <View style={styles.webBrandMark}>
           <Text style={styles.webBrandLetter}>E</Text>
         </View>
@@ -22,12 +28,12 @@ export function WebHeader({
 
       {showNav && (
         <View style={styles.webNavActions}>
-          <Pressable onPress={() => go("search")}>
-            <Text style={styles.webNavIcon}>⌕</Text>
+          <Pressable onPress={() => navigate("search")}>
+            <Feather name="search" size={20} color={colors.primary} />
           </Pressable>
-          <Pressable onPress={() => go("cart")} style={{ position: "relative" }}>
-            <Text style={styles.webNavIcon}>🛒</Text>
-            {cartCount > 0 && (
+          <Pressable onPress={() => navigate("cart")} style={{ position: "relative" }}>
+            <Feather name="shopping-cart" size={20} color={colors.primary} />
+            {count > 0 && (
               <View
                 style={{
                   position: "absolute",
@@ -42,12 +48,15 @@ export function WebHeader({
                   paddingHorizontal: 3,
                 }}
               >
-                <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{cartCount > 99 ? "99+" : cartCount}</Text>
+                <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{count > 99 ? "99+" : count}</Text>
               </View>
             )}
           </Pressable>
-          <Pressable onPress={() => go("profile")}>
-            <Text style={styles.webNavIcon}>◯</Text>
+          <Pressable onPress={() => navigate("profile")}>
+            <Feather name="user" size={20} color={colors.primary} />
+          </Pressable>
+          <Pressable onPress={() => navigate("categories")}>
+            <Feather name="menu" size={20} color={colors.primary} />
           </Pressable>
         </View>
       )}

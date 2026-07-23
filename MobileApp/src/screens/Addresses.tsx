@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Feather from "@expo/vector-icons/Feather";
 import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 import { api, messageFrom, unwrap } from "../api";
 import { Header } from "../components/Header";
@@ -112,7 +113,7 @@ export function Addresses({ back }: { back: () => void }) {
           style={[styles.row, { gap: 8, marginVertical: 8 }]}
           onPress={() => setForm({ ...form, is_default: !form.is_default })}
         >
-          <Text style={{ fontSize: 20 }}>{form.is_default ? "☑" : "☐"}</Text>
+          <Feather name={form.is_default ? "check-square" : "square"} size={20} color={colors.primary} />
           <Text style={styles.body}>Set as default address</Text>
         </Pressable>
         <View style={[styles.row, styles.gapMd]}>

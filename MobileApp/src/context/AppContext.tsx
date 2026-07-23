@@ -1,14 +1,34 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useContext, useState, type ReactNode } from "react";
-import type { Brand, CartItem, Category, Order, Product, Screen, User } from "../types";
+import { StackActions } from "@react-navigation/native";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { api, unwrap } from "../api";
+import { isAuthScreen, screenToRoute } from "../navigation/helpers";
+import { navigationRef } from "../navigation/ref";
+import type {
+  Brand,
+  CartItem,
+  Category,
+  Order,
+  Product,
+  Screen,
+  User,
+} from "../types";
 
 interface AppContextValue {
   // Navigation
-  screen: Screen;
-  history: Screen[];
   go: (screen: Screen) => void;
   back: () => void;
   replace: (screen: Screen) => void;
+
+  // Loading
+  loading: boolean;
 
   // Catalog
   products: Product[];
@@ -55,10 +75,7 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-export function AppProvider({ children, initialScreen }: { children: ReactNode; initialScreen: Screen }) {
-  const [screen, setScreen] = useState<Screen>(initialScreen);
-  const [history, setHistory] = useState<Screen[]>([]);
-
+export function AppProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -73,33 +90,124 @@ export function AppProvider({ children, initialScreen }: { children: ReactNode; 
   const [user, setUser] = useState<User | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const go = (next: Screen) => {
-    setHistory((old) => [...old, screen]);
-    setScreen(next);
-  };
+  // Restore persisted session
+  useEffect(() => {
+    (async () => {
+      const [savedUser, savedToken] = await Promise.all([
+        AsyncStorage.getItem("user"),
+        AsyncStorage.getItem("auth_token"),
+      ]);
+      if (savedUser && savedToken) {
+        try {
+          setUser(JSON.parse(savedUser) as User);
+        } catch {
+          // ignore corrupt storage
+        }
+      }
+    })();
+  }, []);
 
-  const back = () => {
-    setHistory((old) => {
-      const previous = old[old.length - 1] ?? "home";
-      setScreen(previous);
-      return old.slice(0, -1);
-    });
-  };
+  // Fetch public catalog
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const [pRes, fRes, lRes, cRes, bRes] = await Promise.all([
+          api.get("/products"),
+          api.get("/products/featured"),
+          api.get("/products/latest"),
+          api.get("/categories?status=1"),
+          api.get("/brands?status=1"),
+        ]);
+        if (!active) return;
+        setProducts((unwrap(pRes) as Product[]) ?? []);
+        setFeatured((unwrap(fRes) as Product[]) ?? []);
+        setLatest((unwrap(lRes) as Product[]) ?? []);
+        const cats = unwrap(cRes);
+        const brandsData = unwrap(bRes);
+        setCategories(
+          Array.isArray(cats) ? cats : (cats as { data?: Category[] })?.data ?? []
+        );
+        setBrands(
+          Array.isArray(brandsData) ? brandsData : (brandsData as { data?: Brand[] })?.data ?? []
+        );
+      } catch {
+        // ignore; empty catalog will show empty states
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const replace = (next: Screen) => {
-    setScreen(next);
-  };
+  // Sync account data on auth change
+  useEffect(() => {
+    if (!user) {
+      setWishlist([]);
+      setCart([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const [wRes, cRes] = await Promise.all([api.get("/wishlist"), api.get("/cart")]);
+        if (!active) return;
+        setWishlist((unwrap(wRes) as Product[]) ?? []);
+        const cartData = unwrap(cRes) as { items?: CartItem[] };
+        setCart(cartData?.items ?? []);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const go = useCallback((screen: Screen) => {
+    if (!navigationRef.isReady()) return;
+    if (isAuthScreen(screen)) {
+      navigationRef.navigate("Auth", { mode: screen });
+      return;
+    }
+    navigationRef.navigate(screenToRoute(screen) as any);
+  }, []);
+
+  const back = useCallback(() => {
+    if (!navigationRef.isReady()) return;
+    if (navigationRef.canGoBack()) {
+      navigationRef.goBack();
+    } else {
+      navigationRef.navigate("Home");
+    }
+  }, []);
+
+  const replace = useCallback((screen: Screen) => {
+    if (!navigationRef.isReady()) return;
+    if (isAuthScreen(screen)) {
+      navigationRef.dispatch(StackActions.replace("Auth", { mode: screen }));
+      return;
+    }
+    navigationRef.dispatch(StackActions.replace(screenToRoute(screen) as any));
+  }, []);
 
   const addToCart = (product: Product, quantity = 1, size?: string, color?: string) => {
     setCart((items) => {
-      const key = `${product.id}-${size ?? ""}-${color ?? ""}`;
       const existing = items.find(
-        (item) => item.id === product.id && (item.size ?? "") === (size ?? "") && (item.color ?? "") === (color ?? "")
+        (item) =>
+          item.id === product.id &&
+          (item.size ?? "") === (size ?? "") &&
+          (item.color ?? "") === (color ?? "")
       );
       if (existing) {
         return items.map((item) =>
-          item.id === product.id && (item.size ?? "") === (size ?? "") && (item.color ?? "") === (color ?? "")
+          item.id === product.id &&
+          (item.size ?? "") === (size ?? "") &&
+          (item.color ?? "") === (color ?? "")
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
@@ -111,7 +219,8 @@ export function AppProvider({ children, initialScreen }: { children: ReactNode; 
   const removeFromCart = (id: number, size?: string, color?: string) => {
     setCart((items) =>
       items.filter(
-        (item) => !(item.id === id && (item.size ?? "") === (size ?? "") && (item.color ?? "") === (color ?? ""))
+        (item) =>
+          !(item.id === id && (item.size ?? "") === (size ?? "") && (item.color ?? "") === (color ?? ""))
       )
     );
   };
@@ -140,21 +249,29 @@ export function AppProvider({ children, initialScreen }: { children: ReactNode; 
   };
 
   const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // still clear local session
+    }
     await AsyncStorage.multiRemove(["auth_token", "user"]);
     setUser(null);
     setCart([]);
     setWishlist([]);
+    replace("login");
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + Number(item.sale_price ?? item.price) * item.quantity, 0);
+  const cartTotal = cart.reduce(
+    (sum, item) => sum + Number(item.sale_price ?? item.price) * item.quantity,
+    0
+  );
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const value: AppContextValue = {
-    screen,
-    history,
     go,
     back,
     replace,
+    loading,
     products,
     setProducts,
     categories,

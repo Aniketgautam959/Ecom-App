@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Feather from "@expo/vector-icons/Feather";
 import { Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 import { api, messageFrom } from "../api";
 import { Header } from "../components/Header";
@@ -73,7 +74,7 @@ export function Account({ back }: { back: () => void }) {
         <View style={[styles.row, styles.input]}>
           <TextInput style={styles.flex} value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry={!showCurrent} autoCapitalize="none" />
           <Pressable onPress={() => setShowCurrent(!showCurrent)}>
-            <Text style={{ color: colors.textLight }}>{showCurrent ? "Hide" : "Show"}</Text>
+            <Feather name={showCurrent ? "eye-off" : "eye"} size={18} color={colors.textLight} />
           </Pressable>
         </View>
 
@@ -81,7 +82,7 @@ export function Account({ back }: { back: () => void }) {
         <View style={[styles.row, styles.input]}>
           <TextInput style={styles.flex} value={newPassword} onChangeText={setNewPassword} secureTextEntry={!showNew} autoCapitalize="none" />
           <Pressable onPress={() => setShowNew(!showNew)}>
-            <Text style={{ color: colors.textLight }}>{showNew ? "Hide" : "Show"}</Text>
+            <Feather name={showNew ? "eye-off" : "eye"} size={18} color={colors.textLight} />
           </Pressable>
         </View>
 
@@ -89,7 +90,7 @@ export function Account({ back }: { back: () => void }) {
         <View style={[styles.row, styles.input]}>
           <TextInput style={styles.flex} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry={!showConfirm} autoCapitalize="none" />
           <Pressable onPress={() => setShowConfirm(!showConfirm)}>
-            <Text style={{ color: colors.textLight }}>{showConfirm ? "Hide" : "Show"}</Text>
+            <Feather name={showConfirm ? "eye-off" : "eye"} size={18} color={colors.textLight} />
           </Pressable>
         </View>
 

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Feather from "@expo/vector-icons/Feather";
 import { ActivityIndicator, FlatList, Image, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
-import { assetUrl } from "../api";
+import { api, assetUrl, unwrap } from "../api";
 import { Footer } from "../components/Footer";
 import { Nav } from "../components/Nav";
 import { ProductCard } from "../components/ProductCard";
+import { WebHeader } from "../components/WebHeader";
 import { useApp } from "../context/AppContext";
 import { colors, spacing, styles } from "../styles";
 import type { Brand, Category, Product } from "../types";
@@ -11,17 +13,17 @@ import type { Brand, Category, Product } from "../types";
 const heroImage = "https://images.unsplash.com/photo-1516257984-b1b4d707412e?auto=format&fit=crop&w=900&q=85";
 
 const featuresStrip = [
-  { icon: "🚚", title: "Free Shipping", desc: "Upgrade your style today and get FREE shipping on all orders! Don't miss out." },
-  { icon: "🏅", title: "Satisfaction Guarantee", desc: "Shop confidently with our Satisfaction Guarantee: Love it or we'll refund." },
-  { icon: "🛡", title: "Secure Payment", desc: "Your security is our priority. Your payments are with us." },
-];
+  { icon: "truck", title: "Free Shipping", desc: "Upgrade your style today and get FREE shipping on all orders! Don't miss out." },
+  { icon: "award", title: "Satisfaction Guarantee", desc: "Shop confidently with our Satisfaction Guarantee: Love it or we'll refund." },
+  { icon: "shield", title: "Secure Payment", desc: "Your security is our priority. Your payments are with us." },
+] as const;
 
 const trustBadges = [
-  { icon: "🚚", title: "Free Shipping", desc: "On orders above ₹500" },
-  { icon: "↺", title: "Easy Returns", desc: "7-day return policy" },
-  { icon: "🛡", title: "Secure Payment", desc: "100% secure checkout" },
-  { icon: "🎧", title: "24/7 Support", desc: "Always here to help" },
-];
+  { icon: "truck", title: "Free Shipping", desc: "On orders above ₹500" },
+  { icon: "refresh-cw", title: "Easy Returns", desc: "7-day return policy" },
+  { icon: "shield", title: "Secure Payment", desc: "100% secure checkout" },
+  { icon: "headphones", title: "24/7 Support", desc: "Always here to help" },
+] as const;
 
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
@@ -39,6 +41,29 @@ export function Home({ loading }: { loading: boolean }) {
   const [activeTab, setActiveTab] = useState<"featured" | "latest">("featured");
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [heroBanner, setHeroBanner] = useState<{
+    title?: string;
+    subtitle?: string;
+    image?: string;
+    image_url?: string;
+    button_text?: string;
+    link?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get("/banners/home_hero")
+      .then((res) => {
+        if (!active) return;
+        const data = unwrap(res);
+        setHeroBanner(Array.isArray(data) ? data[0] ?? null : data ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const select = (product: Product) => {
     setSelectedProduct(product);
@@ -49,44 +74,7 @@ export function Home({ loading }: { loading: boolean }) {
 
   return (
     <SafeAreaView style={styles.flex}>
-      {/* Header — same as web navbar: round E logo + Ecommerce */}
-      <View style={styles.webNav}>
-        <View style={styles.webBrand}>
-          <View style={styles.webBrandMark}>
-            <Text style={styles.webBrandLetter}>E</Text>
-          </View>
-          <Text style={[styles.webBrandText, { fontSize: 18, fontWeight: "800" }]}>Ecommerce</Text>
-        </View>
-        <View style={styles.webNavActions}>
-          <Pressable onPress={() => go("search")}>
-            <Text style={styles.webNavIcon}>⌕</Text>
-          </Pressable>
-          <Pressable onPress={() => go("cart")} style={{ position: "relative" }}>
-            <Text style={styles.webNavIcon}>🛒</Text>
-            {cartCount > 0 && (
-              <View
-                style={{
-                  position: "absolute",
-                  top: -6,
-                  right: -8,
-                  minWidth: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  backgroundColor: colors.primary,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  paddingHorizontal: 3,
-                }}
-              >
-                <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{cartCount > 99 ? "99+" : cartCount}</Text>
-              </View>
-            )}
-          </Pressable>
-          <Pressable onPress={() => go("profile")}>
-            <Text style={styles.webNavIcon}>◯</Text>
-          </Pressable>
-        </View>
-      </View>
+      <WebHeader showNav />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Hero — same as web HeroSection */}
@@ -95,17 +83,17 @@ export function Home({ loading }: { loading: boolean }) {
             New Collection 2025
           </Text>
           <Text style={{ fontSize: 40, fontWeight: "800", color: colors.text, lineHeight: 46, marginBottom: spacing.lg }}>
-            Fresh Arrivals Online
+            {heroBanner?.title ?? "Fresh Arrivals Online"}
           </Text>
           <Text style={{ fontSize: 15, color: colors.textMuted, marginBottom: spacing.xxl }}>
-            Discover Our Newest Collection Today.
+            {heroBanner?.subtitle ?? "Discover Our Newest Collection Today."}
           </Text>
           <View style={[styles.row, styles.gapLg, { marginBottom: spacing.xl }]}>
             <Pressable
               style={{ backgroundColor: colors.primary, paddingVertical: 16, paddingHorizontal: 28, flexDirection: "row", alignItems: "center", gap: spacing.sm }}
               onPress={() => go("shop")}
             >
-              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", letterSpacing: 0.5 }}>View Collection</Text>
+              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", letterSpacing: 0.5 }}>{heroBanner?.button_text ?? "View Collection"}</Text>
               <Text style={{ color: "#fff", fontSize: 14 }}>→</Text>
             </Pressable>
             <Pressable onPress={() => go("shop")}>
@@ -116,7 +104,7 @@ export function Home({ loading }: { loading: boolean }) {
           {/* Hero image with SS 2025 tag + price badge, gray backdrop like web */}
           <View style={{ backgroundColor: colors.muted, marginHorizontal: -spacing.lg, paddingHorizontal: spacing.lg, paddingTop: spacing.xl }}>
             <View style={{ position: "relative" }}>
-              <Image source={{ uri: heroImage }} style={{ width: "100%", height: 420 }} resizeMode="cover" />
+              <Image source={{ uri: assetUrl(heroBanner?.image_url ?? heroBanner?.image ?? heroImage) }} style={{ width: "100%", height: 420 }} resizeMode="cover" />
               <View style={{ position: "absolute", top: spacing.xl, left: spacing.md, backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 2, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 }}>
                 <Text style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: 2, color: colors.textLight }}>Season</Text>
                 <Text style={{ fontSize: 13, fontWeight: "800", color: colors.text }}>SS 2025</Text>
@@ -133,7 +121,7 @@ export function Home({ loading }: { loading: boolean }) {
         <View style={{ backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.muted, paddingHorizontal: spacing.lg, paddingVertical: spacing.xxl, gap: spacing.xl }}>
           {featuresStrip.map((f) => (
             <View key={f.title} style={{ gap: spacing.sm }}>
-              <Text style={{ fontSize: 24 }}>{f.icon}</Text>
+              <Feather name={f.icon} size={28} color={colors.text} />
               <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>{f.title}</Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, lineHeight: 20 }}>{f.desc}</Text>
             </View>
@@ -190,8 +178,6 @@ export function Home({ loading }: { loading: boolean }) {
                   key={item.id}
                   item={item}
                   onPress={() => select(item)}
-                  onWish={() => toggleWishlist(item)}
-                  wished={wishlist.some((w) => w.id === item.id)}
                 />
               ))}
             </View>
@@ -236,8 +222,6 @@ export function Home({ loading }: { loading: boolean }) {
                   key={item.id}
                   item={item}
                   onPress={() => select(item)}
-                  onWish={() => toggleWishlist(item)}
-                  wished={wishlist.some((w) => w.id === item.id)}
                 />
               ))}
             </View>
@@ -268,7 +252,7 @@ export function Home({ loading }: { loading: boolean }) {
             {trustBadges.map((offer) => (
               <View key={offer.title} style={{ width: "50%", flexDirection: "row", gap: spacing.md, marginBottom: spacing.xl, paddingRight: spacing.sm }}>
                 <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.muted, justifyContent: "center", alignItems: "center" }}>
-                  <Text style={{ fontSize: 16 }}>{offer.icon}</Text>
+                  <Feather name={offer.icon} size={18} color={colors.text} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text }}>{offer.title}</Text>

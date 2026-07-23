@@ -1,3 +1,4 @@
+import Feather from "@expo/vector-icons/Feather";
 import { Image, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
 import { api, assetUrl } from "../api";
 import { Footer } from "../components/Footer";
@@ -55,7 +56,7 @@ export function Cart({ back }: { back: () => void }) {
 
         {cart.length === 0 ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80, gap: spacing.lg }}>
-            <Text style={{ fontSize: 48, color: "#D1D5DB" }}>🛍</Text>
+            <Feather name="shopping-bag" size={48} color={colors.mutedDark} />
             <Text style={{ fontSize: 16, color: colors.textMuted }}>Your cart is empty.</Text>
             <Pressable style={{ backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 4 }} onPress={() => go("shop")}>
               <Text style={{ color: "#fff", fontSize: 14, fontWeight: "500" }}>Continue Shopping</Text>
@@ -144,17 +145,17 @@ export function Cart({ back }: { back: () => void }) {
                         }}
                       >
                         <Pressable onPress={() => changeQuantity(item, item.quantity - 1)}>
-                          <Text style={{ fontSize: 14, color: colors.textLight, paddingHorizontal: 4 }}>−</Text>
+                          <Feather name="minus" size={14} color={colors.textLight} style={{ paddingHorizontal: 4 }} />
                         </Pressable>
                         <Text style={{ fontSize: 13, color: colors.text, width: 20, textAlign: "center" }}>{item.quantity}</Text>
                         <Pressable onPress={() => changeQuantity(item, item.quantity + 1)}>
-                          <Text style={{ fontSize: 14, color: colors.textLight, paddingHorizontal: 4 }}>+</Text>
+                          <Feather name="plus" size={14} color={colors.textLight} style={{ paddingHorizontal: 4 }} />
                         </Pressable>
                       </View>
 
                       {/* Remove */}
                       <Pressable onPress={() => removeFromCart(item.id, item.size, item.color)}>
-                        <Text style={{ fontSize: 20, color: "#D1D5DB" }}>×</Text>
+                        <Feather name="x" size={18} color={colors.textLight} />
                       </Pressable>
                     </View>
                   );

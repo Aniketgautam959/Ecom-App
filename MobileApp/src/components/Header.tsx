@@ -1,4 +1,6 @@
+import Feather from "@expo/vector-icons/Feather";
 import { Pressable, Text, View } from "react-native";
+import { useApp } from "../context/AppContext";
 import { colors, styles } from "../styles";
 import type { Screen } from "../types";
 
@@ -11,16 +13,20 @@ export function Header({
 }: {
   title: string;
   back?: () => void;
-  go: (screen: Screen) => void;
+  go?: (screen: Screen) => void;
   cartCount: number;
   showCart?: boolean;
 }) {
+  const ctx = useApp();
+  const navigate = go ?? ctx.go;
+  const handleBack = back ?? ctx.back;
+
   return (
     <View style={styles.header}>
       <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
         {back ? (
-          <Pressable onPress={back} style={{ marginRight: 12 }}>
-            <Text style={styles.headerBack}>‹</Text>
+          <Pressable onPress={handleBack} style={{ marginRight: 12, padding: 4 }}>
+            <Feather name="chevron-left" size={28} color={colors.primary} />
           </Pressable>
         ) : (
           <View style={[styles.webBrandMark, { marginRight: 10 }]}>
@@ -30,8 +36,11 @@ export function Header({
         <Text style={styles.headerTitle}>{title}</Text>
       </View>
       {showCart ? (
-        <Pressable onPress={() => go("cart")} style={{ position: "relative" }}>
-          <Text style={styles.headerIcon}>🛒</Text>
+        <Pressable
+          onPress={() => navigate("cart")}
+          style={{ position: "relative", padding: 4 }}
+        >
+          <Feather name="shopping-cart" size={22} color={colors.primary} />
           {cartCount > 0 && (
             <View
               style={{
@@ -47,7 +56,9 @@ export function Header({
                 paddingHorizontal: 3,
               }}
             >
-              <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{cartCount > 99 ? "99+" : cartCount}</Text>
+              <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>
+                {cartCount > 99 ? "99+" : cartCount}
+              </Text>
             </View>
           )}
         </Pressable>

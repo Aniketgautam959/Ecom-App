@@ -1,11 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useState } from "react";
+import Feather from "@expo/vector-icons/Feather";
 import { Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 import { api, messageFrom, unwrap } from "../api";
 import { Header } from "../components/Header";
 import { Nav } from "../components/Nav";
 import { useApp } from "../context/AppContext";
-import { styles } from "../styles";
+import { colors, styles } from "../styles";
 import type { User } from "../types";
 
 export function Profile({ back }: { back: () => void }) {
@@ -43,12 +44,20 @@ export function Profile({ back }: { back: () => void }) {
     <SafeAreaView style={styles.flex}>
       <Header title="My Profile" back={back} go={go} cartCount={cartCount} />
       <ScrollView contentContainerStyle={styles.form}>
-        <Text style={styles.body}>Name: {user?.first_name} {user?.last_name}</Text>
-        <Text style={styles.body}>Email: {user?.email_id}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 24 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" }}>
+            <Feather name="user" size={28} color="#fff" />
+          </View>
+          <View>
+            <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>{user?.first_name} {user?.last_name}</Text>
+            <Text style={{ fontSize: 13, color: colors.textLight, marginTop: 2 }}>{user?.email_id}</Text>
+          </View>
+        </View>
 
         <Text style={styles.subheading}>Edit Details</Text>
         {message && (
-          <View style={message.includes("success") ? styles.successBox : styles.errorBox}>
+          <View style={[message.includes("success") ? styles.successBox : styles.errorBox, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+            <Feather name={message.includes("success") ? "check-circle" : "alert-circle"} size={16} color={message.includes("success") ? colors.success : colors.error} />
             <Text style={styles.alertText}>{message}</Text>
           </View>
         )}
@@ -64,27 +73,27 @@ export function Profile({ back }: { back: () => void }) {
 
         <Pressable style={[styles.menuItem, { marginTop: 16 }]} onPress={() => go("orders")}>
           <Text style={styles.menuText}>My Orders</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("addresses")}>
           <Text style={styles.menuText}>Addresses</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("wishlist")}>
           <Text style={styles.menuText}>Wishlist</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("notifications")}>
           <Text style={styles.menuText}>Notifications</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("account")}>
           <Text style={styles.menuText}>Account Settings</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
         <Pressable style={styles.menuItem} onPress={() => go("support")}>
           <Text style={styles.menuText}>Support</Text>
-          <Text>›</Text>
+          <Feather name="chevron-right" size={16} color={colors.textLight} />
         </Pressable>
 
         <Pressable style={[styles.secondaryButton, { marginTop: 24 }]} onPress={signOut}>

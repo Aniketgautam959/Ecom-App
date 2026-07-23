@@ -1,8 +1,37 @@
-import { Pressable, Text, View } from "react-native";
+import Feather from "@expo/vector-icons/Feather";
+import { useEffect, useState } from "react";
+import { Linking, Pressable, Text, View } from "react-native";
+import { api, unwrap } from "../api";
 import { colors, spacing } from "../styles";
 import type { Screen } from "../types";
 
+interface FooterMenu {
+  id: number;
+  label: string;
+  url: string;
+}
+
+function screenFromUrl(url: string): Screen {
+  return (url.replace(/^\//, "").replace(/\/$/, "") as Screen) ?? "home";
+}
+
 export function Footer({ go }: { go: (screen: Screen) => void }) {
+  const [footerMenus, setFooterMenus] = useState<FooterMenu[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get("/menus/footer")
+      .then((res) => {
+        if (!active) return;
+        setFooterMenus((unwrap(res) as FooterMenu[]) ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const linkStyle = { fontSize: 13, color: colors.textMuted, paddingVertical: 5 };
   const headingStyle = {
     fontSize: 11,
@@ -33,13 +62,19 @@ export function Footer({ go }: { go: (screen: Screen) => void }) {
             </View>
             <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text }}>Ecommerce</Text>
           </View>
-          <Text style={{ fontSize: 13, color: colors.textMuted, lineHeight: 20, marginBottom: spacing.lg }}>
+          <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: spacing.md, lineHeight: 20 }}>
             DevCut is a YouTube channel for practical project-based learning.
           </Text>
-          <View style={{ flexDirection: "row", gap: spacing.lg }}>
-            <Text style={{ fontSize: 18, color: colors.textMuted }}>◉</Text>
-            <Text style={{ fontSize: 18, color: colors.textMuted }}>◈</Text>
-            <Text style={{ fontSize: 18, color: colors.textMuted }}>▶</Text>
+          <View style={{ flexDirection: "row", gap: spacing.md }}>
+            <Pressable onPress={() => Linking.openURL("https://github.com")}>
+              <Feather name="github" size={20} color={colors.textMuted} />
+            </Pressable>
+            <Pressable onPress={() => Linking.openURL("https://instagram.com")}>
+              <Feather name="instagram" size={20} color={colors.textMuted} />
+            </Pressable>
+            <Pressable onPress={() => Linking.openURL("https://youtube.com")}>
+              <Feather name="youtube" size={20} color={colors.textMuted} />
+            </Pressable>
           </View>
         </View>
 
@@ -60,12 +95,22 @@ export function Footer({ go }: { go: (screen: Screen) => void }) {
         {/* Quick Links */}
         <View style={{ marginBottom: spacing.xl }}>
           <Text style={headingStyle}>Quick Links</Text>
-          <Pressable onPress={() => go("about")}>
-            <Text style={linkStyle}>About us</Text>
-          </Pressable>
-          <Pressable onPress={() => go("contact")}>
-            <Text style={linkStyle}>Contact</Text>
-          </Pressable>
+          {footerMenus.length > 0 ? (
+            footerMenus.map((menu) => (
+              <Pressable key={menu.id} onPress={() => go(screenFromUrl(menu.url))}>
+                <Text style={linkStyle}>{menu.label}</Text>
+              </Pressable>
+            ))
+          ) : (
+            <>
+              <Pressable onPress={() => go("about")}>
+                <Text style={linkStyle}>About us</Text>
+              </Pressable>
+              <Pressable onPress={() => go("contact")}>
+                <Text style={linkStyle}>Contact</Text>
+              </Pressable>
+            </>
+          )}
         </View>
 
         {/* Shop */}

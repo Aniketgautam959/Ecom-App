@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
-import { api, messageFrom, unwrap } from "../api";
+import Feather from "@expo/vector-icons/Feather";
+import { ActivityIndicator, Alert, Image, Pressable, SafeAreaView, ScrollView, Text, View } from "react-native";
+import { api, assetUrl, messageFrom, unwrap } from "../api";
 import { Header } from "../components/Header";
 import { useApp } from "../context/AppContext";
 import { colors, money, statusColors, styles } from "../styles";
@@ -60,14 +61,29 @@ export function OrderDetails({ back }: { back: () => void }) {
             <Text style={styles.small}>Placed on {new Date(order.created_at ?? order.date).toLocaleDateString()}</Text>
           </View>
 
-          <Text style={styles.subheading}>Items</Text>
+          <View style={[styles.row, { alignItems: "center", gap: 8, marginBottom: 8 }]}>
+            <Feather name="package" size={16} color={colors.text} />
+            <Text style={styles.subheading}>Items ({order.items?.length ?? 0})</Text>
+          </View>
           {order.items?.map((item) => (
-            <View key={item.id} style={[styles.cartItem, { borderBottomColor: colors.mutedDark }]}>
-              <View style={styles.cartInfo}>
-                <Text style={styles.cartName}>{item.product_name}</Text>
-                <Text style={styles.cartVariant}>Qty: {item.quantity}</Text>
+            <View key={item.id} style={[styles.row, { alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.muted }]}>
+              <View style={{ width: 56, height: 56, backgroundColor: colors.muted, borderRadius: 4, overflow: "hidden", justifyContent: "center", alignItems: "center" }}>
+                {item.product_image ? (
+                  <Image source={{ uri: assetUrl(item.product_image) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                ) : (
+                  <Feather name="package" size={20} color={colors.textLight} />
+                )}
               </View>
-              <Text style={styles.cartPrice}>{money(item.total)}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 13, fontWeight: "500", color: colors.text }} numberOfLines={1}>{item.product_name}</Text>
+                <Text style={{ fontSize: 11, color: colors.textLight, marginTop: 2 }}>
+                  Qty: {item.quantity}{item.size ? ` • Size: ${item.size}` : ""}{item.color ? ` • Color: ${item.color}` : ""}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>{money(item.total)}</Text>
+                <Text style={{ fontSize: 11, color: colors.textLight }}>{money(item.price)} each</Text>
+              </View>
             </View>
           ))}
 
@@ -98,14 +114,26 @@ export function OrderDetails({ back }: { back: () => void }) {
           </View>
 
           <View style={[styles.webCard, { marginTop: 16 }]}>
-            <Text style={styles.subheading}>Shipping</Text>
+            <View style={[styles.row, { alignItems: "center", gap: 8, marginBottom: 8 }]}>
+              <Feather name="truck" size={16} color={colors.text} />
+              <Text style={styles.subheading}>Shipping</Text>
+            </View>
             <Text style={styles.body}>{order.shipping.name}</Text>
             <Text style={styles.body}>{order.shipping.phone}</Text>
             <Text style={styles.body}>{order.shipping.address}</Text>
             <Text style={styles.body}>{order.shipping.city}, {order.shipping.state} - {order.shipping.pincode}</Text>
           </View>
 
-          {["pending", "confirmed", "processing"].includes(order.status.toLowerCase()) && (
+          <View style={[styles.webCard, { marginTop: 16 }]}>
+            <View style={[styles.row, { alignItems: "center", gap: 8, marginBottom: 8 }]}>
+              <Feather name="credit-card" size={16} color={colors.text} />
+              <Text style={styles.subheading}>Payment</Text>
+            </View>
+            <Text style={styles.body}>{order.payment_method?.toUpperCase()}</Text>
+            <Text style={styles.body}>Status: <Text style={{ fontWeight: "600" }}>{order.payment_status ? order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1) : ""}</Text></Text>
+          </View>
+
+          {["pending", "confirmed"].includes(order.status.toLowerCase()) && (
             <Pressable style={[styles.secondaryButton, { borderColor: colors.error }]} onPress={cancel}>
               <Text style={{ color: colors.error }}>Cancel Order</Text>
             </Pressable>

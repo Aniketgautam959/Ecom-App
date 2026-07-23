@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Feather from "@expo/vector-icons/Feather";
 import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from "react-native";
 import { api, messageFrom } from "../api";
 import { Header } from "../components/Header";
@@ -31,12 +32,16 @@ export function Payment({ back }: { back: () => void }) {
     <SafeAreaView style={styles.flex}>
       <Header title="Payment" back={back} go={go} cartCount={cartCount} />
       <ScrollView contentContainerStyle={styles.form}>
-        <Text style={styles.heading}>Complete payment</Text>
-        <Text style={styles.body}>Order #{selectedOrder?.order_number}</Text>
-        <Text style={[styles.heading, { marginTop: 8 }]}>{money(selectedOrder?.total ?? 0)}</Text>
+        <View style={{ alignItems: "center", marginBottom: 16 }}>
+          <Feather name="credit-card" size={48} color={colors.primary} />
+        </View>
+        <Text style={[styles.heading, { textAlign: "center" }]}>Complete payment</Text>
+        <Text style={[styles.body, { textAlign: "center" }]}>Order #{selectedOrder?.order_number}</Text>
+        <Text style={[styles.heading, { textAlign: "center", marginTop: 8 }]}>{money(selectedOrder?.total ?? 0)}</Text>
         <Text style={styles.inputLabel}>Payment / Transaction ID</Text>
         <TextInput style={styles.input} value={txid} onChangeText={setTxid} placeholder="Enter transaction ID" />
-        <Pressable style={[styles.primaryButton, { marginTop: 12 }]} onPress={verify} disabled={loading}>
+        <Pressable style={[styles.primaryButton, { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]} onPress={verify} disabled={loading}>
+          <Feather name="check" size={14} color="#fff" />
           <Text style={styles.primaryButtonText}>{loading ? "Verifying..." : "Verify Payment"}</Text>
         </Pressable>
         <Pressable style={[styles.secondaryButton, { marginTop: 12 }]} onPress={() => replace("order-failed")}>
